@@ -41,45 +41,33 @@ def log_debug(msg):
     logger.debug(msg)
 
 JEWELRY_PROMPTS = [
-    # --- Earring-specific (6) ---
-    "Single earring, clean white background, soft studio lighting, macro detail shot showing craftsmanship, professional jewelry product photography, 8K realistic",
-    "Pair of earrings elegantly suspended on invisible thread, pure white background, crisp shadows, luxury brand catalog style, hyper-realistic detail",
-    "Earring displayed on a minimalist white bust, natural daylight, clean and simple composition, high-end jewelry editorial, photorealistic",
-    "Single earring lying flat on white silk, soft overhead lighting, extreme close-up on gemstone facets and metal polish, luxury product shot, 8K",
-    "Pair of earrings arranged symmetrically on white marble, rim lighting creating subtle glow on edges, premium jewelry catalog, photorealistic",
-    "Earring captured mid-air as if gently falling onto white surface, frozen motion, crisp focus, creative luxury editorial, hyper-realistic",
+    # --- Studio Product Photography (4) ---
+    "The jewelry piece placed on a smooth white marble surface, professional studio lighting with two soft-box lights from 45-degree angles, pure white background, ultra-sharp macro focus capturing all surface details, no color alteration, product photography style",
+    "Jewelry displayed on a minimalist frosted glass pedestal, diffused overhead light with a subtle fill reflector, neutral gray gradient background, tack-sharp lens, colors and form exactly as original, commercial luxury brand style",
+    "Flat-lay top-down view of the jewelry item on a brushed light-gray concrete surface, ring flash lighting for even illumination, high-resolution macro capture preserving every facet and texture, exact original color palette retained",
+    "Jewelry suspended on a fine transparent acrylic stand against a deep charcoal background, dramatic rim lighting highlighting contours without altering metal tone or stone color, fine-art product photography",
 
-    # --- Ring-specific (6) ---
-    "Ring standing upright on white surface, soft directional light creating gentle shadow, macro focus on metal texture and stone facets, clean product shot, 8K realistic",
-    "Ring on pristine white marble, natural window light, elegant minimal composition, luxury jewelry catalog, photorealistic detail",
-    "Ring floating slightly above a mirror surface, soft reflection below, clean studio lighting, high-end jewelry advertisement style, hyper-realistic",
-    "Ring worn on a hand with fingers elegantly posed, white background, soft natural light, lifestyle luxury shot, photorealistic skin texture",
-    "Ring placed inside a small white jewelry box with lid open, soft spotlight, unboxing luxury experience, 8K realistic detail",
-    "Ring photographed from directly above on white surface, perfect symmetry, crisp shadow directly below, minimalist product photography, hyper-realistic",
+    # --- Lifestyle / Worn (4) ---
+    "A woman's elegant hand wearing the jewelry against a soft bokeh outdoor garden background, natural golden-hour sunlight, lifestyle fashion aesthetic, original jewelry color and form fully preserved, shallow depth of field",
+    "Close-up of the jewelry worn at a refined wrist or neckline, muted linen fabric in the background, natural window light casting soft shadows, upscale lifestyle editorial mood, no color or shape modification to the piece",
+    "Jewelry resting on a real marble vanity tray beside a single white orchid and soft linen cloth, warm ambient room light, luxury lifestyle still-life composition, all original material finishes maintained",
+    "Jewelry being held gently in a model's palm, soft natural daylight from a side window, minimal depth of field isolating the piece, authentic skin tone and original jewelry color unmodified, aspirational lifestyle mood",
 
-    # --- Bracelet-specific (6) ---
-    "Bracelet laid in a gentle curve on white silk, soft diffused lighting, clean elegant composition, luxury product photography, 8K realistic detail",
-    "Bracelet clasped around a minimalist white display cylinder, studio lighting, crisp focus on links and texture, professional jewelry catalog, photorealistic",
-    "Bracelet draped naturally on white surface, soft shadows, clean and simple presentation, high-end jewelry editorial, hyper-realistic",
-    "Bracelet worn on a wrist with elegant pose, white background, natural daylight, lifestyle luxury photography, photorealistic skin and metal detail",
-    "Bracelet arranged in a perfect circle on white marble, overhead shot, symmetrical composition, premium catalog style, 8K realistic",
-    "Bracelet cascading in an S-curve on white velvet, soft side lighting highlighting each link, luxury product showcase, hyper-realistic",
+    # --- Lifestyle / Scene (3) ---
+    "The jewelry displayed beside a cup of espresso and an open book on a neutral linen tablecloth, warm indoor ambient light, relaxed morning lifestyle vibe, original metal and stone colors preserved accurately",
+    "Jewelry placed on top of a folded cashmere fabric in dusty rose, soft diffused studio-lifestyle hybrid lighting, high-end fashion mood, exact original shape and hue of the piece faithfully reproduced",
+    "Jewelry as the hero element in a high-fashion editorial spread, the piece photographed on a model in dramatic side-lighting with deep shadows, Vogue-level production quality, original design and color not modified",
 
-    # --- Necklace-specific (6) ---
-    "Necklace laid in an elegant arc on white velvet, soft studio lighting, macro detail on pendant and chain, luxury product photography, 8K realistic",
-    "Necklace displayed on a minimalist white bust form, natural daylight, clean composition, high-end jewelry catalog, photorealistic detail",
-    "Necklace flowing gracefully on pure white background, soft directional light, crisp focus on gemstone details, professional jewelry advertisement, hyper-realistic",
-    "Necklace worn on a neck with elegant collarbone visible, white background, soft natural light, lifestyle luxury editorial, photorealistic",
-    "Necklace arranged in a circular coil on white surface, pendant centered, overhead macro shot, premium jewelry catalog, 8K realistic",
-    "Necklace draped over the edge of a white jewelry display stand, soft shadows, creative luxury composition, hyper-realistic detail",
+    # --- Editorial / Artistic (4) ---
+    "Overhead editorial flat-lay with the jewelry at center, surrounded by luxury props — pressed botanicals, gold foil paper, silk ribbon — neutral palette background so the piece remains dominant, color and form unaltered",
+    "The jewelry photographed against a textured aged-gold patterned backdrop, professional editorial lighting, cinematic color grade applied only to the environment, original jewelry material and tone left unchanged",
+    "Jewelry placed on a raw stone slab with scattered rose petals, high-fashion editorial composition, dramatic top-lighting, moody atmosphere, colors and silhouette of the piece exactly as designed",
+    "Close-up editorial portrait where the jewelry is featured near the collarbone or earlobe, soft rim lighting on skin, negative space in background for text, original jewelry geometry and color perfectly intact",
 
-    # --- General luxury presentation (6) ---
-    "Jewelry piece on clean white background, professional studio lighting, sharp focus on metal and stone details, luxury product photography, 8K realistic",
-    "Jewelry displayed on white marble surface, natural soft light, elegant minimal composition, high-end catalog style, photorealistic",
-    "Jewelry floating on pure white with subtle reflection, clean commercial lighting, luxury brand advertisement look, hyper-realistic detail",
-    "Jewelry piece with a single rose petal nearby on white surface, soft romantic lighting, Valentine's luxury collection style, photorealistic",
-    "Jewelry photographed with a soft beam of light creating a subtle halo effect, white background, premium brand campaign, 8K realistic",
-    "Jewelry on white surface with a delicate shadow pattern from window blinds, natural morning light, artistic luxury editorial, hyper-realistic",
+    # --- Macro / Detail (3) ---
+    "Extreme macro shot of the jewelry showing micro-detail — every prong, grain, and facet — under a ring-flash and fiber optic side light combination, clinical precision, original color and shape not modified, white seamless background",
+    "45-degree macro angle capturing depth of the jewelry construction — layers, settings, and textures — with razor-sharp focus throughout, studio light eliminating all shadows, faithful representation of exact original color",
+    "Reflective detail shot with the jewelry tilted to catch a specular highlight across the surface, neutral dark slate background providing contrast, original tone and surface treatment unchanged, ultra-high resolution",
 ]
 
 def load_state():
