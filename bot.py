@@ -1,0 +1,465 @@
+import asyncio
+import logging
+import aiohttp
+import json
+import os
+from pathlib import Path
+from datetime import datetime
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+
+# --- NEW JEWELRY IMPORTS ---
+from jewelry_interface import JewelrySessionManager
+from jewelry_engine import process_jewelry_request
+
+# --- CONFIGURATION ---
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8971263763:***")
+FAL_AI_KEY = os.environ.get("FAL_AI_KEY", "aba0afab-6bce-403a-8929-e78f08b6ace8:8b2740446eddcda5b41684dae7e11d1b")
+
+# Model endpoints
+FLUX_MODEL = "fal-ai/flux/dev"
+FLUX_API = f"https://fal.run/{FLUX_MODEL}"
+GPT_EDIT_MODEL = "openai/gpt-image-2/edit"
+GPT_EDIT_API = f"https://fal.run/{GPT_EDIT_MODEL}"
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Bot + Dispatcher
+bot = Bot(token=TELEGRAM_TOKEN)
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
+
+# Paths — relative to project root, works on any machine
+BASE_DIR = Path(__file__).parent
+JEWELRY_INPUT_DIR = BASE_DIR / "jewelry_input"
+JEWELRY_OUTPUT_DIR = BASE_DIR / "jewelry_output"
+JEWELRY_STATE_FILE = BASE_DIR / "jewelry_state.json"
+
+# State Managers
+jewelry_mgr = JewelrySessionManager()
+
+class EditState(StatesGroup):
+    waiting_for_photo = State()
+    waiting_for_edit_prompt = State()
+
+# --- STYLES ---
+STYLES = {
+    "📸 photoreal": {"prefix": "A hyper-realistic, high-detail photograph of", "suffix": "8K resolution, professional photography"},
+    "🎨 anime": {"prefix": "High-quality anime style art of", "suffix": "vibrant colors, studio anime quality"},
+    "🖌️ digital": {"prefix": "A stunning digital illustration of", "suffix": "digital art, concept art, 4K"},
+    "🎬 cinematic": {"prefix": "A cinematic movie still of", "suffix": "cinematic lighting, film grain"},
+}
+user_prompts = {}
+
+def get_style_keyboard():
+    builder = InlineKeyboardBuilder()
+    for style_name in STYLES.keys():
+        builder.button(text=style_name, callback_data=f"style_{style_name}")
+    builder.adjust(2)
+    return builder.as_markup()
+
+def enhance_prompt(user_prompt, style_key):
+    style = STYLES.get(style_key, STYLES["📸 photoreal"])
+    return f"{style['prefix']} {user_prompt}, {style['suffix']}"
+
+# --- fal.ai Helpers ---
+async def call_fal_api(model, api_url, payload):
+    headers = {"Authorization": f"Key {FAL_AI_KEY}", "Content-Type": "application/json"}
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(api_url, headers=headers, json=payload) as resp:
+                if resp.status != 200: 
+                    text = await resp.text()
+                    print(f"LOG: fal.ai submit error {resp.status}: {text}")
+                    return None
+                submit_data = await resp.json()
+                request_id = submit_data.get("request_id")
+                if not request_id: 
+                    print(f"LOG: No request_id in response: {submit_data}")
+                    return None
+            status_url = f"https://fal.run/{model}/requests/{request_id}/status"
+            for _ in range(60):
+                await asyncio.sleep(2)
+                async with session.get(status_url, headers=headers) as status_resp:
+                    if status_resp.status != 200:
+                        continue
+                    status_data = await status_resp.json()
+                    if status_data.get("status") == "COMPLETED":
+                        result = status_data.get("result", {})
+                        images = result.get("images", [])
+                        if images: return images[0]["url"]
+                        image = result.get("image", {})
+                        if image: return image["url"]
+                        print(f"LOG: Completed but no image URL found in {status_data}")
+                        return None
+                    if status_data.get("status") in ("FAILED", "CANCELLED"): 
+                        print(f"LOG: fal.ai request status: {status_data.get('status')}")
+                        return None
+    except Exception as e:
+        print(f"LOG: Exception in call_fal_api: {e}")
+    return None
+
+async def generate_flux_image(prompt):
+    return await call_fal_api(FLUX_MODEL, FLUX_API, {"prompt": prompt, "image_size": "landscape_4_3"})
+
+async def edit_image_gpt(photo_url, edit_prompt):
+    return await call_fal_api(GPT_EDIT_MODEL, GPT_EDIT_API, {"prompt": edit_prompt, "image_urls": [photo_url]})
+
+# --- Helpers ---
+
+WELCOME_TEXT = (
+    "🎨 **Welcome to the AI Art Studio!**\n\n"
+    "🖼️ **Create:** `/draw <prompt>`\n"
+    "✂️ **Edit:** `/edit`\n"
+    "💎 **Jewelry Studio:** Choose an option below for professional renders!\n"
+)
+
+def get_welcome_keyboard():
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📦 Option A: Batch Upload", callback_data="jewel_opt_a")
+    builder.button(text="🖼️ Option B: Single Image", callback_data="jewel_opt_b")
+    builder.button(text="📊 Check Status", callback_data="jewel_status")
+    builder.button(text="🎲 Random Generate", callback_data="jewel_random")
+    builder.adjust(2)
+    return builder.as_markup()
+
+async def show_welcome_menu(chat_id):
+    """Re-show the welcome menu so user can easily generate more."""
+    await bot.send_message(chat_id, WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+
+# --- Handlers ---
+
+@dp.message(Command("start"))
+async def cmd_start(message: Message):
+    jewelry_mgr.start_session(message.from_user.id)
+    await message.answer(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+
+@dp.callback_query(F.data.startswith("jewel_opt_"))
+async def handle_jewelry_option(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    option = "A" if callback.data == "jewel_opt_a" else "B"
+    response = jewelry_mgr.handle_option(user_id, option)
+    await callback.message.answer(response)
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_status")
+async def handle_status_check(callback: CallbackQuery):
+    input_files = list(JEWELRY_INPUT_DIR.glob("*.jpg")) + list(JEWELRY_INPUT_DIR.glob("*.png")) + list(JEWELRY_INPUT_DIR.glob("*.jpeg"))
+    output_files = list(JEWELRY_OUTPUT_DIR.glob("*.png"))
+    
+    # Filter out .DS_Store
+    input_count = len([f for f in input_files if f.name != ".DS_Store"])
+    output_count = len(output_files)
+    
+    msg = (
+        f"📊 **Folder Status**\n\n"
+        f"📥 **Input** (`jewelry_input/`): **{input_count}** images waiting\n"
+        f"📤 **Output** (`jewelry_output/`): **{output_count}** generated images\n"
+    )
+    await callback.message.answer(msg, parse_mode="Markdown")
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_random")
+async def handle_random_generate(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    jewelry_mgr.start_session(user_id)
+    session = jewelry_mgr.sessions[user_id]
+    
+    # Scan input folder for available images
+    input_files = [f for f in (list(JEWELRY_INPUT_DIR.glob("*.jpg")) + list(JEWELRY_INPUT_DIR.glob("*.png")) + list(JEWELRY_INPUT_DIR.glob("*.jpeg"))) if f.name != ".DS_Store"]
+    
+    if not input_files:
+        await callback.message.answer("📥 **No images in input folder!** Upload some first via Option A or B.")
+        await callback.answer()
+        return
+    
+    # Store available files in session
+    session["uploaded_files"] = [str(f) for f in input_files]
+    session["step"] = "AWAITING_RANDOM_COUNT"
+    
+    await callback.message.answer(
+        f"🎲 **Random Generate**\n\n"
+        f"📥 {len(input_files)} images available in `jewelry_input/`\n\n"
+        f"How many images should I randomly pick and generate?\n"
+        f"Enter a number (max {len(input_files)}):",
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_ai")
+async def handle_ai_specialist(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    from jewelry_engine import JEWELRY_PROMPTS
+    import random
+    prompt = random.choice(JEWELRY_PROMPTS)
+    
+    session["config"]["prompt"] = prompt
+    session["step"] = "CONFIRMATION"
+    
+    files = session.get("uploaded_files", [])
+    count_msg = f"\n📸 Images to process: {len(files)}" if len(files) > 1 else ""
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+    
+    await callback.message.answer(
+        f"✨ **AI Specialist Choice:**\n\n`{prompt}`{count_msg}\n\nReady to generate?", 
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_user")
+async def handle_user_prompt_request(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    await callback.message.answer("✍️ Please type the exact prompt you want to use for this image.")
+    session["step"] = "AWAITING_B_PROMPT_TEXT"
+    await callback.answer()
+
+@dp.message(F.photo)
+async def handle_all_photos(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if session and session["step"] in ("AWAITING_UPLOAD", "AWAITING_SINGLE_UPLOAD"):
+        photo = message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"upload_{timestamp}_{photo.file_unique_id[:8]}.jpg"
+        save_path = JEWELRY_INPUT_DIR / filename
+        await bot.download_file(file_info.file_path, save_path)
+        files = session.get("uploaded_files", [])
+        files.append(str(save_path))
+        session["uploaded_files"] = files
+        response = jewelry_mgr.handle_upload(user_id, files)
+        
+        if session["step"] == "AWAITING_B_PROMPT":
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
+            builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
+            
+            await message.answer(
+                f"{response}\n\n"
+                "Choose your creative direction for this piece:\n\n"
+                "✨ **AI Specialist:** I'll use my luxury jewelry library to make it look professional.\n"
+                "✍️ **My Own Prompt:** You tell me exactly how to change it.",
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+            return
+        
+        await message.answer(response)
+        return
+    
+    current_state = await state.get_state()
+    if current_state == EditState.waiting_for_photo:
+        photo = message.photo[-1]
+        file_info = await bot.get_file(photo.file_id)
+        photo_url = f"https://api.telegram.org/file/bot{TELEGRAM_TOKEN}/{file_info.file_path}"
+        await state.update_data(photo_url=photo_url)
+        await state.set_state(EditState.waiting_for_edit_prompt)
+        await message.answer("📸 Photo received! Now describe what to change...")
+        return
+
+@dp.message()
+async def handle_jewelry_text_inputs(message: Message):
+    user_id = message.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    if session["step"] == "AWAITING_UPLOAD":
+        text = message.text.strip().lower()
+        if text in ("done", "ok", "ready", "go"):
+            files = session.get("uploaded_files", [])
+            if not files:
+                await message.answer("❌ No photos received yet. Send at least one photo first.")
+                return
+            session["step"] = "AWAITING_B_PROMPT"
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
+            builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
+            await message.answer(
+                f"✅ {len(files)} images received. Would you like me to use my ✨ AI Specialist prompts or ✍️ your own?\n\n"
+                "Choose your creative direction for this piece:\n\n"
+                "✨ **AI Specialist:** I'll use my luxury jewelry library to make it look professional.\n"
+                "✍️ **My Own Prompt:** You tell me exactly how to change it.",
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+            return
+        # Otherwise ignore — user is still uploading photos
+        return
+
+    if session["step"] == "AWAITING_RANDOM_COUNT":
+        try:
+            count = int(message.text)
+            files = session.get("uploaded_files", [])
+            max_count = len(files)
+            if count < 1 or count > max_count:
+                await message.answer(f"❌ Please enter a number between 1 and {max_count}.")
+                return
+            session["config"]["num_images"] = count
+            session["config"]["styles_per_image"] = 1
+            session["step"] = "AWAITING_B_PROMPT"
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
+            builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
+            await message.answer(
+                f"🎲 Will randomly pick **{count}** of **{max_count}** images.\n\n"
+                "Choose your creative direction for this piece:\n\n"
+                "✨ **AI Specialist:** I'll use my luxury jewelry library to make it look professional.\n"
+                "✍️ **My Own Prompt:** You tell me exactly how to change it.",
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+            return
+        except:
+            await message.answer("❌ Please enter a number.")
+            return
+
+    if session["step"] == "AWAITING_STYLES":
+        try:
+            styles = int(message.text)
+            if styles not in (1, 2):
+                await message.answer("❌ Please enter 1 or 2.")
+                return
+            await message.answer("📸 Now, how many images should I pick from your batch?")
+            session["config"]["styles_per_image"] = styles
+            session["step"] = "AWAITING_COUNT"
+            return
+        except: await message.answer("❌ Please enter a number.")
+
+    if session["step"] == "AWAITING_COUNT":
+        try:
+            count = int(message.text)
+            response = jewelry_mgr.handle_batch_config(user_id, session["config"]["styles_per_image"], count)
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+            await message.answer(response, reply_markup=builder.as_markup())
+            session["step"] = "CONFIRMATION"
+            return
+        except: await message.answer("❌ Please enter a number.")
+
+    if session["step"] == "AWAITING_B_PROMPT_TEXT":
+        prompt = message.text
+        session["config"]["prompt"] = prompt
+        session["step"] = "CONFIRMATION"
+        
+        files = session.get("uploaded_files", [])
+        count_msg = f"\n📸 Images to process: {len(files)}" if len(files) > 1 else ""
+        
+        builder = InlineKeyboardBuilder()
+        builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+        
+        await message.answer(
+            f"✍️ **Your Prompt:**\n`{prompt}`{count_msg}\n\nReady to generate?", 
+            reply_markup=builder.as_markup(),
+            parse_mode="Markdown"
+        )
+        return
+
+@dp.callback_query(F.data == "confirm_gen")
+async def handle_confirm_generate(callback: CallbackQuery):
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session or session["step"] != "CONFIRMATION": return
+    
+    # Acknowledge callback first to prevent timeout
+    try:
+        await callback.answer()
+    except:
+        pass
+    
+    await callback.message.answer("🚀 **Processing started!**")
+    
+    try:
+        files = session.get("uploaded_files", [])
+        if not files:
+            await callback.message.answer("❌ No image found in session.")
+            return
+        
+        prompt = session["config"].get("prompt", "professional jewelry style")
+        
+        if len(files) > 1:
+            # Batch: process images, respecting num_images if set (random generate)
+            num_images = session["config"].get("num_images", len(files))
+            params = {
+                "image_paths": files,
+                "num_images": num_images,
+                "styles_per_image": 1,
+                "prompt": prompt,
+            }
+            results = await process_jewelry_request('BATCH', params, callback_msg=callback.message)
+            if not results:
+                await callback.message.answer("❌ AI Engine returned no results.")
+                return
+            for res in results:
+                await callback.message.answer_photo(photo=types.FSInputFile(JEWELRY_OUTPUT_DIR / res["file"]), caption=f"💎 {res['prompt']}")
+        else:
+            # Single image
+            params = {
+                "image_path": files[0],
+                "prompt": prompt,
+            }
+            res = await process_jewelry_request('SINGLE', params, callback_msg=callback.message)
+            if res: 
+                await callback.message.answer_photo(photo=types.FSInputFile(JEWELRY_OUTPUT_DIR / res["file"]), caption=f"💎 {res['prompt']}")
+            else: 
+                await callback.message.answer("❌ AI Engine failed to generate the image.")
+    except Exception as e: 
+        import traceback
+        print(f"CRITICAL ERROR: {traceback.format_exc()}")
+        await callback.message.answer(f"❌ **Critical Error:**\n`{str(e)}`")
+    finally:
+        await show_welcome_menu(callback.message.chat.id)
+
+@dp.message(Command("draw"))
+async def cmd_draw(message: Message):
+    prompt = message.text.replace("/draw", "").strip()
+    if not prompt: return await message.answer("❌ Prompt missing!")
+    user_prompts[message.chat.id] = prompt
+    await message.answer("✨ **Choose style:**", reply_markup=get_style_keyboard())
+
+@dp.callback_query(F.data.startswith("style_"))
+async def handle_style(callback: CallbackQuery):
+    style = callback.data.replace("style_", "")
+    prompt = user_prompts.get(callback.message.chat.id)
+    if not prompt: return
+    await callback.answer("Generating...")
+    url = await generate_flux_image(enhance_prompt(prompt, style))
+    if url: await callback.message.answer_photo(photo=url, caption=f"🎨 {style}")
+    else: await callback.message.answer("❌ Failed.")
+    await show_welcome_menu(callback.message.chat.id)
+
+@dp.message(Command("edit"))
+async def cmd_edit(message: Message, state: FSMContext):
+    await state.set_state(EditState.waiting_for_photo)
+    await message.answer("✂️ Send the photo you want to edit.")
+
+@dp.message(EditState.waiting_for_edit_prompt)
+async def receive_edit_prompt(message: Message, state: FSMContext):
+    data = await state.get_data()
+    url = await edit_image_gpt(data["photo_url"], message.text)
+    if url: await message.answer_photo(photo=url, caption="✅ Edited!")
+    else: await message.answer("❌ Failed.")
+    await state.clear()
+    await show_welcome_menu(message.chat.id)
+
+async def main():
+    try: await dp.start_polling(bot)
+    finally: await bot.session.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())

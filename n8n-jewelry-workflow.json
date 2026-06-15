@@ -1,0 +1,58 @@
+{
+  "name": "Jewelry AI Generation",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Start",
+      "type": "n8n-nodes-base.start",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.image_url }}",
+        "options": {
+          "headerName1": "Authorization",
+          "headerValue1": "Key aba0afab-6bce-403a-8929-e78f08b6ace8:8b2740446eddcda5b41684dae7e11d1b"
+        }
+      },
+      "name": "HTTP Request 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "jsonParameters": true,
+          "dataPropertyName": "$",
+          "outputPropertyName": "$"
+        }
+      },
+      "name": "Set Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        {
+          "node": "HTTP Request 1",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    },
+    "HTTP Request 1": {
+      "main": [
+        {
+          "node": "Set Output",
+          "type": "main",
+          "index": 0
+        }
+      ]
+    }
+  }
+}
