@@ -5,6 +5,8 @@ import json
 import os
 from pathlib import Path
 from datetime import datetime
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).parent / ".env")
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
@@ -18,8 +20,8 @@ from jewelry_interface import JewelrySessionManager
 from jewelry_engine import process_jewelry_request
 
 # --- CONFIGURATION ---
-TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "8971263763:***")
-FAL_AI_KEY = os.environ.get("FAL_AI_KEY", "aba0afab-6bce-403a-8929-e78f08b6ace8:8b2740446eddcda5b41684dae7e11d1b")
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+FAL_AI_KEY = os.environ["FAL_AI_KEY"]
 
 # Model endpoints
 FLUX_MODEL = "fal-ai/flux/dev"

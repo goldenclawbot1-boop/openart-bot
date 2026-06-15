@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 # --- CONFIG ---
-FAL_AI_KEY = os.environ.get("FAL_AI_KEY", "aba0afab-6bce-403a-8929-e78f08b6ace8:8b2740446eddcda5b41684dae7e11d1b")
+FAL_AI_KEY = os.environ["FAL_AI_KEY"]
 GPT_EDIT_MODEL = "openai/gpt-image-2/edit"
 GPT_EDIT_API = f"https://fal.run/{GPT_EDIT_MODEL}"
 
