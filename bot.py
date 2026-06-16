@@ -206,6 +206,7 @@ async def handle_ai_specialist(callback: CallbackQuery):
     prompt = random.choice(JEWELRY_PROMPTS)
     
     session["config"]["prompt"] = prompt
+    session["config"]["prompt_mode"] = "same"
     session["step"] = "CONFIRMATION"
     
     files = session.get("uploaded_files", [])
@@ -215,9 +216,101 @@ async def handle_ai_specialist(callback: CallbackQuery):
     builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
     
     await callback.message.answer(
-        f"✨ **AI Specialist Choice:**\n\n`{prompt}`{count_msg}\n\nReady to generate?", 
+        f"✨ **AI Specialist — Same Prompt:**\n\n`{prompt}`{count_msg}\n\nReady to generate?", 
         reply_markup=builder.as_markup(),
         parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_ai_same")
+async def handle_ai_same(callback: CallbackQuery):
+    """AI Specialist — Same prompt for all images"""
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    from jewelry_engine import JEWELRY_PROMPTS
+    import random
+    prompt = random.choice(JEWELRY_PROMPTS)
+    
+    session["config"]["prompt"] = prompt
+    session["config"]["prompt_mode"] = "same"
+    session["step"] = "CONFIRMATION"
+    
+    files = session.get("uploaded_files", [])
+    num_images = session["config"].get("num_images", len(files))
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+    
+    await callback.message.answer(
+        f"✨ **AI Specialist — Same Prompt for All:**\n\n`{prompt}`\n\n📸 {num_images} images will use this prompt.\nReady to generate?", 
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_ai_diff")
+async def handle_ai_diff(callback: CallbackQuery):
+    """AI Specialist — Different prompt per image"""
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    session["config"]["prompt_mode"] = "diff"
+    session["config"]["prompt"] = None  # Engine will pick per image
+    session["step"] = "CONFIRMATION"
+    
+    files = session.get("uploaded_files", [])
+    num_images = session["config"].get("num_images", len(files))
+    
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+    
+    await callback.message.answer(
+        f"✨ **AI Specialist — Different Prompt per Image:**\n\n📸 Each of the {num_images} images will get a unique random prompt from the luxury jewelry library.\nReady to generate?", 
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_user_same")
+async def handle_user_same(callback: CallbackQuery):
+    """User prompt — Same for all images"""
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    session["config"]["prompt_mode"] = "same"
+    session["step"] = "AWAITING_B_PROMPT_TEXT"
+    
+    files = session.get("uploaded_files", [])
+    num_images = session["config"].get("num_images", len(files))
+    
+    await callback.message.answer(
+        f"✍️ **Your Prompt — Same for All:**\n\nPlease type the exact prompt you want to use.\n📸 This prompt will be applied to all {num_images} images."
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data == "jewel_prompt_user_diff")
+async def handle_user_diff(callback: CallbackQuery):
+    """User prompt — Different per image (collect one by one)"""
+    user_id = callback.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if not session: return
+    
+    session["config"]["prompt_mode"] = "diff"
+    session["config"]["user_prompts"] = []
+    session["config"]["prompt_index"] = 0
+    
+    files = session.get("uploaded_files", [])
+    num_images = session["config"].get("num_images", len(files))
+    session["config"]["num_images"] = num_images
+    
+    session["step"] = "AWAITING_B_PROMPT_TEXT_MULTI"
+    
+    await callback.message.answer(
+        f"✍️ **Your Prompts — Different per Image:**\n\n📸 You'll type {num_images} prompts, one for each image.\n\n**Prompt 1/{num_images}:** Type your first prompt now."
     )
     await callback.answer()
 
@@ -248,6 +341,29 @@ async def handle_all_photos(message: Message, state: FSMContext):
         response = jewelry_mgr.handle_upload(user_id, files)
         
         if session["step"] == "AWAITING_B_PROMPT":
+            files = session.get("uploaded_files", [])
+            if len(files) > 1:
+                # Multi-image: show 4 prompt-mode buttons
+                builder = InlineKeyboardBuilder()
+                builder.button(text="✨ AI Same Prompt", callback_data="jewel_prompt_ai_same")
+                builder.button(text="✨ AI Diff Prompts", callback_data="jewel_prompt_ai_diff")
+                builder.button(text="✍️ My Same Prompt", callback_data="jewel_prompt_user_same")
+                builder.button(text="✍️ My Diff Prompts", callback_data="jewel_prompt_user_diff")
+                builder.adjust(2)
+                
+                await message.answer(
+                    f"{response}\n\n"
+                    "Choose your creative direction for these pieces:\n\n"
+                    "✨ **AI Same Prompt:** One luxury prompt applied to all images.\n"
+                    "✨ **AI Diff Prompts:** Each image gets a unique random prompt.\n"
+                    "✍️ **My Same Prompt:** You write one prompt for all images.\n"
+                    "✍️ **My Diff Prompts:** You write a different prompt for each image.",
+                    reply_markup=builder.as_markup(),
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # Single image: show 2 buttons
             builder = InlineKeyboardBuilder()
             builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
             builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
@@ -289,6 +405,26 @@ async def handle_jewelry_text_inputs(message: Message):
                 await message.answer("❌ No photos received yet. Send at least one photo first.")
                 return
             session["step"] = "AWAITING_B_PROMPT"
+            if len(files) > 1:
+                # Multi-image: show 4 prompt-mode buttons
+                builder = InlineKeyboardBuilder()
+                builder.button(text="✨ AI Same Prompt", callback_data="jewel_prompt_ai_same")
+                builder.button(text="✨ AI Diff Prompts", callback_data="jewel_prompt_ai_diff")
+                builder.button(text="✍️ My Same Prompt", callback_data="jewel_prompt_user_same")
+                builder.button(text="✍️ My Diff Prompts", callback_data="jewel_prompt_user_diff")
+                builder.adjust(2)
+                await message.answer(
+                    f"✅ {len(files)} images received. Choose your creative direction for these pieces:\n\n"
+                    "✨ **AI Same Prompt:** One luxury prompt applied to all images.\n"
+                    "✨ **AI Diff Prompts:** Each image gets a unique random prompt.\n"
+                    "✍️ **My Same Prompt:** You write one prompt for all images.\n"
+                    "✍️ **My Diff Prompts:** You write a different prompt for each image.",
+                    reply_markup=builder.as_markup(),
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # Single image: show 2 buttons
             builder = InlineKeyboardBuilder()
             builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
             builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
@@ -315,6 +451,27 @@ async def handle_jewelry_text_inputs(message: Message):
             session["config"]["num_images"] = count
             session["config"]["styles_per_image"] = 1
             session["step"] = "AWAITING_B_PROMPT"
+            if count > 1:
+                # Multi-image: show 4 prompt-mode buttons
+                builder = InlineKeyboardBuilder()
+                builder.button(text="✨ AI Same Prompt", callback_data="jewel_prompt_ai_same")
+                builder.button(text="✨ AI Diff Prompts", callback_data="jewel_prompt_ai_diff")
+                builder.button(text="✍️ My Same Prompt", callback_data="jewel_prompt_user_same")
+                builder.button(text="✍️ My Diff Prompts", callback_data="jewel_prompt_user_diff")
+                builder.adjust(2)
+                await message.answer(
+                    f"🎲 Will randomly pick **{count}** of **{max_count}** images.\n\n"
+                    "Choose your creative direction for these pieces:\n\n"
+                    "✨ **AI Same Prompt:** One luxury prompt applied to all images.\n"
+                    "✨ **AI Diff Prompts:** Each image gets a unique random prompt.\n"
+                    "✍️ **My Same Prompt:** You write one prompt for all images.\n"
+                    "✍️ **My Diff Prompts:** You write a different prompt for each image.",
+                    reply_markup=builder.as_markup(),
+                    parse_mode="Markdown"
+                )
+                return
+            
+            # Single image: show 2 buttons
             builder = InlineKeyboardBuilder()
             builder.button(text="✨ AI Specialist", callback_data="jewel_prompt_ai")
             builder.button(text="✍️ My Own Prompt", callback_data="jewel_prompt_user")
@@ -372,6 +529,35 @@ async def handle_jewelry_text_inputs(message: Message):
         )
         return
 
+    if session["step"] == "AWAITING_B_PROMPT_TEXT_MULTI":
+        prompt = message.text
+        user_prompts = session["config"].get("user_prompts", [])
+        user_prompts.append(prompt)
+        session["config"]["user_prompts"] = user_prompts
+        
+        prompt_index = session["config"].get("prompt_index", 0) + 1
+        session["config"]["prompt_index"] = prompt_index
+        num_images = session["config"].get("num_images", 1)
+        
+        if prompt_index >= num_images:
+            # All prompts collected
+            session["step"] = "CONFIRMATION"
+            builder = InlineKeyboardBuilder()
+            builder.button(text="✅ Confirm & Process", callback_data="confirm_gen")
+            
+            prompts_list = "\n".join([f"  {i+1}. `{p[:80]}{'...' if len(p)>80 else ''}`" for i, p in enumerate(user_prompts)])
+            await message.answer(
+                f"✍️ **Your Prompts — All Collected:**\n\n{prompts_list}\n\n📸 {num_images} images, each with its own prompt.\nReady to generate?",
+                reply_markup=builder.as_markup(),
+                parse_mode="Markdown"
+            )
+        else:
+            # Ask for next prompt
+            await message.answer(
+                f"✍️ **Prompt {prompt_index+1}/{num_images}:** Type your next prompt now."
+            )
+        return
+
 @dp.callback_query(F.data == "confirm_gen")
 async def handle_confirm_generate(callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -393,6 +579,8 @@ async def handle_confirm_generate(callback: CallbackQuery):
             return
         
         prompt = session["config"].get("prompt", "professional jewelry style")
+        prompt_mode = session["config"].get("prompt_mode", "same")
+        user_prompts = session["config"].get("user_prompts", [])
         
         if len(files) > 1:
             # Batch: process images, respecting num_images if set (random generate)
@@ -402,6 +590,8 @@ async def handle_confirm_generate(callback: CallbackQuery):
                 "num_images": num_images,
                 "styles_per_image": 1,
                 "prompt": prompt,
+                "prompt_mode": prompt_mode,
+                "user_prompts": user_prompts,
             }
             results = await process_jewelry_request('BATCH', params, callback_msg=callback.message)
             if not results:

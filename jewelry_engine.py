@@ -343,6 +343,8 @@ async def process_jewelry_request(request_type, params, callback_msg=None):
             num_to_pick = params.get('num_images', 1)
             styles_count = params.get('styles_per_image', 1)
             user_prompt = params.get('prompt')  # Optional: user-specified prompt
+            prompt_mode = params.get('prompt_mode', 'same')  # 'same' or 'diff'
+            user_prompts = params.get('user_prompts', [])  # List of per-image prompts
 
             if not paths:
                 await notify("Error: No image paths provided")
@@ -367,7 +369,16 @@ async def process_jewelry_request(request_type, params, callback_msg=None):
 
                 file_success = False
                 for i in range(styles_count):
-                    prompt = user_prompt if user_prompt else random.choice(JEWELRY_PROMPTS)
+                    # Determine prompt based on mode
+                    if prompt_mode == 'diff':
+                        if user_prompts and idx < len(user_prompts):
+                            prompt = user_prompts[idx]  # User-provided per-image prompt
+                        else:
+                            prompt = random.choice(JEWELRY_PROMPTS)  # AI random per image
+                    else:
+                        # 'same' mode: use the single prompt for all
+                        prompt = user_prompt if user_prompt else random.choice(JEWELRY_PROMPTS)
+                    
                     await notify(f"Generating style {i+1}/{styles_count}...")
                     res_url = await edit_image(session, img_url, prompt, notify=notify)
                     if res_url:
