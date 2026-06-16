@@ -143,6 +143,18 @@ async def cmd_start(message: Message):
     jewelry_mgr.start_session(message.from_user.id)
     await message.answer(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
 
+@dp.message(Command("cancel"))
+async def cmd_cancel(message: Message):
+    """Global cancel — works from any state. Resets session and shows welcome menu."""
+    user_id = message.from_user.id
+    session = jewelry_mgr.sessions.get(user_id)
+    if session:
+        # Reset session completely
+        session["step"] = "START"
+        session["config"] = {}
+        session["uploaded_files"] = []
+    await message.answer("↩ **Cancelled.** Starting fresh.", parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+
 @dp.callback_query(F.data.startswith("jewel_opt_"))
 async def handle_jewelry_option(callback: CallbackQuery):
     user_id = callback.from_user.id
