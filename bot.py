@@ -266,7 +266,7 @@ async def cmd_start(message: Message):
         )
         return
     jewelry_mgr.start_session(user_id)
-    await message.answer(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+    await message.answer(get_welcome_text(user_id), parse_mode="Markdown", reply_markup=get_welcome_keyboard())
 
 # --- Admin Commands ---
 @dp.message(Command("adduser"))
