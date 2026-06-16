@@ -591,7 +591,7 @@ async def handle_jewelry_text_inputs(message: Message):
 
     if session["step"] == "AWAITING_B_PROMPT_TEXT":
         text = message.text.strip().lower()
-        if text == "cancel":
+        if text in ("cancel", "/cancel"):
             # User wants to go back to prompt selection
             files = session.get("uploaded_files", [])
             session["step"] = "AWAITING_B_PROMPT"
@@ -651,7 +651,7 @@ async def handle_jewelry_text_inputs(message: Message):
 
     if session["step"] == "AWAITING_B_PROMPT_TEXT_MULTI":
         text = message.text.strip().lower()
-        if text == "cancel":
+        if text in ("cancel", "/cancel"):
             # User wants to go back to prompt selection
             files = session.get("uploaded_files", [])
             session["step"] = "AWAITING_B_PROMPT"
