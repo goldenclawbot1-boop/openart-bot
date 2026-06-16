@@ -9,7 +9,30 @@ from pathlib import Path
 
 # --- CONFIG ---
 FAL_AI_KEY = os.environ["FAL_AI_KEY"]
-GPT_EDIT_MODEL = "openai/gpt-image-2/edit"
+
+# Available image editing models
+AVAILABLE_MODELS = {
+    "gpt": {
+        "id": "openai/gpt-image-2/edit",
+        "name": "GPT Image 2",
+        "emoji": "🧠",
+        "desc": "OpenAI — fine-grained edits, best fidelity",
+    },
+    "nano": {
+        "id": "fal-ai/nano-banana-2/edit",
+        "name": "Nano Banana 2",
+        "emoji": "🍌",
+        "desc": "Google — fast generation, creative edits",
+    },
+}
+DEFAULT_MODEL = "gpt"
+
+def get_model_api(model_key: str) -> str:
+    """Get the fal.run API URL for a model key."""
+    model_id = AVAILABLE_MODELS.get(model_key, AVAILABLE_MODELS[DEFAULT_MODEL])["id"]
+    return f"https://fal.run/{model_id}"
+
+GPT_EDIT_MODEL = AVAILABLE_MODELS["gpt"]["id"]
 GPT_EDIT_API = f"https://fal.run/{GPT_EDIT_MODEL}"
 
 FAL_REST_BASE = "https://rest.alpha.fal.ai"
@@ -182,18 +205,21 @@ def _extract_image_url(data):
         return _extract_image_url(result)
     return None
 
-async def edit_image(session, image_url, prompt, notify=None):
+async def edit_image(session, image_url, prompt, model_key="gpt", notify=None):
     """
     Submit an edit job to fal.ai and poll for the result.
-    Uses async mode (no sync_mode) because gpt-image-2/edit can take
+    Uses async mode (no sync_mode) because image editing can take
     2-5 minutes and sync_mode=True will time out the HTTP connection.
+    
+    model_key: "gpt" (GPT Image 2) or "nano" (Nano Banana 2)
     """
+    api_url = get_model_api(model_key)
     headers = {"Authorization": f"Key {FAL_AI_KEY}", "Content-Type": "application/json"}
     payload = {"prompt": prompt, "image_urls": [image_url]}
 
     try:
         # Step 1: Submit the job (returns immediately with request_id)
-        async with session.post(GPT_EDIT_API, headers=headers, json=payload) as resp:
+        async with session.post(api_url, headers=headers, json=payload) as resp:
             if resp.status != 200:
                 text = await resp.text()
                 logger.error(f"EDIT SUBMIT ERROR {resp.status}: {text[:300]}")
@@ -336,10 +362,11 @@ async def download_image(session, url, path):
     print(f"DOWNLOAD FAILED: {url}", flush=True)
     return False
 
-async def process_jewelry_request(request_type, params, callback_msg=None):
+async def process_jewelry_request(request_type, params, callback_msg=None, model_key="gpt"):
     """
     Main entry point for the bot logic.
     callback_msg: aiogram Message object for live progress updates
+    model_key: "gpt" (GPT Image 2) or "nano" (Nano Banana 2)
     
     Returns dict with 'file' and 'prompt' for SINGLE, or list of dicts for BATCH.
     Also cleans up input files after successful generation to save space
@@ -398,7 +425,7 @@ async def process_jewelry_request(request_type, params, callback_msg=None):
                         prompt = user_prompt if user_prompt else random.choice(JEWELRY_PROMPTS)
                     
                     await notify(f"Generating style {i+1}/{styles_count}...")
-                    res_url = await edit_image(session, img_url, prompt, notify=notify)
+                    res_url = await edit_image(session, img_url, prompt, model_key=model_key, notify=notify)
                     if res_url:
                         out_name = f"{Path(file_path).stem}_style{i+1}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                         out_path = OUTPUT_DIR / out_name
@@ -443,7 +470,7 @@ async def process_jewelry_request(request_type, params, callback_msg=None):
                 return None
 
             await notify("AI is generating your professional jewelry render... (this can take a couple of minutes)")
-            res_url = await edit_image(session, img_url, prompt, notify=notify)
+            res_url = await edit_image(session, img_url, prompt, model_key=model_key, notify=notify)
             if res_url:
                 out_name = f"{path.stem}_single_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
                 out_path = OUTPUT_DIR / out_name

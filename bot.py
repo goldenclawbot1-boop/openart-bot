@@ -17,7 +17,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- NEW JEWELRY IMPORTS ---
 from jewelry_interface import JewelrySessionManager
-from jewelry_engine import process_jewelry_request
+from jewelry_engine import process_jewelry_request, AVAILABLE_MODELS, DEFAULT_MODEL
 
 # --- CONFIGURATION ---
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
@@ -176,13 +176,17 @@ WELCOME_TEXT = (
     "💎 **Jewelry Studio:** Choose an option below for professional renders!\n"
 )
 
+# Per-user model preference (defaults to "gpt")
+user_model = {}
+
 def get_welcome_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="📦 Option A: Batch Upload", callback_data="jewel_opt_a")
     builder.button(text="🖼️ Option B: Single Image", callback_data="jewel_opt_b")
     builder.button(text="📊 Check Status", callback_data="jewel_status")
     builder.button(text="🎲 Random Generate", callback_data="jewel_random")
-    builder.adjust(2)
+    builder.button(text="⚙️ Switch Model", callback_data="jewel_model_menu")
+    builder.adjust(2, 2, 1)
     return builder.as_markup()
 
 async def show_welcome_menu(chat_id):
@@ -190,6 +194,52 @@ async def show_welcome_menu(chat_id):
     await bot.send_message(chat_id, WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
 
 # --- Handlers ---
+
+# --- Model Selection ---
+@dp.callback_query(F.data == "jewel_model_menu")
+async def handle_model_menu(callback: CallbackQuery):
+    """Show available models for user to choose."""
+    user_id = callback.from_user.id
+    current = user_model.get(user_id, DEFAULT_MODEL)
+    
+    builder = InlineKeyboardBuilder()
+    for key, info in AVAILABLE_MODELS.items():
+        active = " ✅" if key == current else ""
+        builder.button(
+            text=f"{info['emoji']} {info['name']}{active}",
+            callback_data=f"jewel_model_{key}"
+        )
+    builder.adjust(1)
+    
+    current_info = AVAILABLE_MODELS[current]
+    await callback.message.answer(
+        f"⚙️ **Select AI Model**\n\n"
+        f"Current: {current_info['emoji']} **{current_info['name']}** — {current_info['desc']}\n\n"
+        f"Choose a model:",
+        reply_markup=builder.as_markup(),
+        parse_mode="Markdown"
+    )
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("jewel_model_"))
+async def handle_model_select(callback: CallbackQuery):
+    """Set user's preferred model."""
+    user_id = callback.from_user.id
+    model_key = callback.data.replace("jewel_model_", "")
+    
+    if model_key not in AVAILABLE_MODELS:
+        await callback.answer("Unknown model.")
+        return
+    
+    user_model[user_id] = model_key
+    info = AVAILABLE_MODELS[model_key]
+    
+    await callback.message.answer(
+        f"✅ Model switched to {info['emoji']} **{info['name']}** — {info['desc']}",
+        parse_mode="Markdown"
+    )
+    await show_welcome_menu(callback.message.chat.id)
+    await callback.answer()
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
@@ -878,6 +928,7 @@ async def handle_confirm_generate(callback: CallbackQuery):
         prompt = session["config"].get("prompt", "professional jewelry style")
         prompt_mode = session["config"].get("prompt_mode", "same")
         user_prompts = session["config"].get("user_prompts", [])
+        model_key = user_model.get(user_id, DEFAULT_MODEL)
         
         if len(files) > 1:
             # Batch: process images, respecting num_images if set (random generate)
@@ -890,7 +941,7 @@ async def handle_confirm_generate(callback: CallbackQuery):
                 "prompt_mode": prompt_mode,
                 "user_prompts": user_prompts,
             }
-            results = await process_jewelry_request('BATCH', params, callback_msg=callback.message)
+            results = await process_jewelry_request('BATCH', params, callback_msg=callback.message, model_key=model_key)
             if not results:
                 await callback.message.answer("❌ AI Engine returned no results.")
                 return
@@ -902,7 +953,7 @@ async def handle_confirm_generate(callback: CallbackQuery):
                 "image_path": files[0],
                 "prompt": prompt,
             }
-            res = await process_jewelry_request('SINGLE', params, callback_msg=callback.message)
+            res = await process_jewelry_request('SINGLE', params, callback_msg=callback.message, model_key=model_key)
             if res: 
                 await callback.message.answer_photo(photo=types.FSInputFile(JEWELRY_OUTPUT_DIR / res["file"]), caption=f"💎 {res['prompt']}")
             else: 
