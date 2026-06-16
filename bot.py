@@ -23,6 +23,25 @@ from jewelry_engine import process_jewelry_request
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 FAL_AI_KEY = os.environ["FAL_AI_KEY"]
 
+# --- ACCESS CONTROL ---
+# Whitelist: only these Telegram user IDs can use the bot.
+# Add your own ID and any authorized users here.
+ALLOWED_USERS = {
+    8677244120,  # GoldenClaw (admin)
+    # Add more authorized user IDs below:
+    # 123456789,
+    # 987654321,
+}
+
+# Admin IDs — can manage the whitelist
+ADMIN_IDS = {8677244120}
+
+def is_allowed(user_id: int) -> bool:
+    return user_id in ALLOWED_USERS
+
+def is_admin(user_id: int) -> bool:
+    return user_id in ADMIN_IDS
+
 # Model endpoints
 FLUX_MODEL = "fal-ai/flux/dev"
 FLUX_API = f"https://fal.run/{FLUX_MODEL}"
@@ -37,6 +56,40 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=TELEGRAM_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
+
+# --- Access Control Middleware ---
+from aiogram import BaseMiddleware
+from aiogram.types import Update
+
+class AccessMiddleware(BaseMiddleware):
+    """Block all non-whitelisted users. /start is allowed for everyone (shows rejection message)."""
+    
+    async def __call__(self, handler, event, data):
+        # Extract user ID from event
+        user_id = None
+        if hasattr(event, 'from_user') and event.from_user:
+            user_id = event.from_user.id
+        elif hasattr(event, 'message') and event.message and event.message.from_user:
+            user_id = event.message.from_user.id
+        elif hasattr(event, 'callback_query') and event.callback_query and event.callback_query.from_user:
+            user_id = event.callback_query.from_user.id
+        
+        if user_id is None:
+            return  # Can't determine user — let it through
+        
+        if is_allowed(user_id):
+            return await handler(event, data)
+        
+        # Blocked user — only allow /start to show rejection
+        if hasattr(event, 'message') and event.message and event.message.text:
+            text = event.message.text.strip().lower()
+            if text == "/start":
+                return await handler(event, data)
+        
+        # Silently ignore all other interactions from blocked users
+        return
+
+dp.update.middleware(AccessMiddleware())
 
 # Paths — relative to project root, works on any machine
 BASE_DIR = Path(__file__).parent
@@ -140,8 +193,91 @@ async def show_welcome_menu(chat_id):
 
 @dp.message(Command("start"))
 async def cmd_start(message: Message):
-    jewelry_mgr.start_session(message.from_user.id)
+    user_id = message.from_user.id
+    if not is_allowed(user_id):
+        await message.answer(
+            "🔒 **Access Restricted**\n\n"
+            "This bot is private. You are not authorized to use it.\n\n"
+            "If you believe this is a mistake, contact the bot owner.",
+            parse_mode="Markdown"
+        )
+        return
+    jewelry_mgr.start_session(user_id)
     await message.answer(WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+
+# --- Admin Commands ---
+@dp.message(Command("adduser"))
+async def cmd_adduser(message: Message):
+    """Admin: add a user to the whitelist. Usage: /adduser <user_id>"""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return  # Silently ignore non-admins
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("❌ Usage: `/adduser <user_id>`", parse_mode="Markdown")
+        return
+    try:
+        new_id = int(parts[1])
+    except ValueError:
+        await message.answer("❌ Invalid user ID. Must be a number.")
+        return
+    
+    if new_id in ALLOWED_USERS:
+        await message.answer(f"ℹ️ User `{new_id}` is already whitelisted.")
+        return
+    
+    ALLOWED_USERS.add(new_id)
+    await message.answer(f"✅ User `{new_id}` added to whitelist. They can now use the bot.")
+
+@dp.message(Command("removeuser"))
+async def cmd_removeuser(message: Message):
+    """Admin: remove a user from the whitelist. Usage: /removeuser <user_id>"""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return
+    
+    parts = message.text.split()
+    if len(parts) < 2:
+        await message.answer("❌ Usage: `/removeuser <user_id>`", parse_mode="Markdown")
+        return
+    try:
+        target_id = int(parts[1])
+    except ValueError:
+        await message.answer("❌ Invalid user ID. Must be a number.")
+        return
+    
+    if target_id in ADMIN_IDS:
+        await message.answer("❌ Cannot remove an admin from the whitelist.")
+        return
+    
+    if target_id not in ALLOWED_USERS:
+        await message.answer(f"ℹ️ User `{target_id}` is not in the whitelist.")
+        return
+    
+    ALLOWED_USERS.discard(target_id)
+    await message.answer(f"✅ User `{target_id}` removed from whitelist.")
+
+@dp.message(Command("listusers"))
+async def cmd_listusers(message: Message):
+    """Admin: list all whitelisted users."""
+    user_id = message.from_user.id
+    if not is_admin(user_id):
+        return
+    
+    if not ALLOWED_USERS:
+        await message.answer("📋 No users in whitelist.")
+        return
+    
+    lines = []
+    for uid in sorted(ALLOWED_USERS):
+        tag = " 👑 admin" if uid in ADMIN_IDS else ""
+        lines.append(f"  • `{uid}`{tag}")
+    
+    await message.answer(
+        f"📋 **Whitelisted Users ({len(ALLOWED_USERS)}):**\n\n" + "\n".join(lines),
+        parse_mode="Markdown"
+    )
 
 @dp.message(Command("cancel"))
 async def cmd_cancel(message: Message):
