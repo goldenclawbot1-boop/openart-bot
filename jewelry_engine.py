@@ -59,6 +59,33 @@ JEWELRY_PROMPTS = [
     # --- Optical / Atmospheric (2) ---
     "The jewelry piece photographed through a pane of etched optical glass that creates concentric circle refractions in the negative space while leaving the centered jewelry in perfect crystalline focus, background a single flat tone of warm ash gray, technical composite photograph, jewelry color and shape not manipulated",
     "The piece lit exclusively by the natural luminescence of backlit Japanese shoji paper panels, color temperature 4200K, a precise snooted accent light at 3% power defining the highest specular point on the piece, deep cream background, long-exposure integration, original jewelry color and form reproduced with scientific fidelity",
+
+    # --- Hands & Gesture (1) ---
+    "Jewelry featured as sole focus in a hands-in-frame gesture shot — model's hands cupped open presenting the piece, skin in perfect neutral light, background a gradient from cool off-white to pure white, Phase One IQ4 150MP simulation quality, no cropping or distortion of jewelry, color and shape pixel-accurate to original",
+
+    # --- Synthetic Ice Encasement (1) ---
+    "The jewelry piece encased in a block of optically clear synthetic ice on a backlit translucent white acrylic table, light source beneath diffusing upward through ice, creating a three-dimensional glow around but not touching the piece, the jewelry itself rendered in perfect clarity with original color and exact contour unaffected by surrounding ice",
+
+    # --- Cashmere Drape (1) ---
+    "Jewelry displayed atop a folded swatch of double-faced cashmere in deep ivory, the textile draped naturally creating soft topographic folds radiating from the piece, overhead Chimera 4x6 softbox, second kicker light at 120 degrees behind subject, all fabric texture captured at micro-fiber level, jewelry color and profile unchanged",
+
+    # --- Crepuscular-Ray Lighting (1) ---
+    "Crepuscular-ray lighting setup: jewelry placed at the convergence point of five parallel beams of theatrical haze-diffused light entering from a slatted overhead grid, each beam 4cm wide, producing a systematic pattern of light and shadow across the plinth while the piece itself sits in the brightest intersection, jewelry color and shape unmodified",
+
+    # --- Miniature Gallery (1) ---
+    "Architectural sectional view: jewelry photographed in a purpose-built white foam-core environment scaled to look like a modernist gallery room — miniature spotlights, a tiny pedestal, negative-space walls — the piece the size of a sculpture inside this constructed world, shot from eye-level with the miniature room, jewelry's real colors and geometry faithfully retained",
+
+    # --- Motion Freeze Portrait (1) ---
+    "Jewelry captured in a slow-motion portrait freeze: model mid-turn, hair lifted by motion, gown fabric trailing, the jewelry piece pinned in absolute tack-sharp focus while all surrounding elements render at 1/15s motion blur, high-power strobe freezing only the piece, original jewelry color and shape reference-locked, cinematic luxury campaign aesthetic",
+
+    # --- Convex Mirror Reflection (1) ---
+    "The piece positioned at the focal point of a convex antique mirror surface, the reflection of a candlelit interior visible in the curved background while the jewelry itself is front-lit by a controlled LED panel, creating a contrast between warm ambient environment and cool precision product light, jewelry color and exact form unmodified",
+
+    # --- Tungsten Fresnel Half-Light (1) ---
+    "Jewelry illuminated by a single portable tungsten Fresnel spot at 3200K bounced off a 24-inch round gold-white reflector positioned at camera height, producing a warm wrap-around half-light that models the three-dimensional form of the piece without obscuring detail, background pure photographic black, jewelry's original color temperature anchored in post, shape intact",
+
+    # --- Double-Exposure Composite (1) ---
+    "Double-exposure composite concept: the jewelry piece's silhouette filled with an interior macro world — microscopic crystal lattice structures, magnified stone inclusions, metal grain patterns — the outer shape boundary razor-defined, background studio white, the composite reveals the jewelry's inner material world while preserving its exact original outline and authentic surface color at full opacity",
 ]
 
 def load_state():
