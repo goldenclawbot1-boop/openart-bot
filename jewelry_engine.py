@@ -25,7 +25,7 @@ AVAILABLE_MODELS = {
         "desc": "Google — fast generation, creative edits",
     },
 }
-DEFAULT_MODEL = "gpt"
+DEFAULT_MODEL = "nano"
 
 def get_model_api(model_key: str) -> str:
     """Get the fal.run API URL for a model key."""
@@ -94,9 +94,6 @@ JEWELRY_PROMPTS = [
 
     # --- Crepuscular-Ray Lighting (1) ---
     "Crepuscular-ray lighting setup: jewelry placed at the convergence point of five parallel beams of theatrical haze-diffused light entering from a slatted overhead grid, each beam 4cm wide, producing a systematic pattern of light and shadow across the plinth while the piece itself sits in the brightest intersection, jewelry color and shape unmodified",
-
-    # --- Miniature Gallery (1) ---
-    "Architectural sectional view: jewelry photographed in a purpose-built white foam-core environment scaled to look like a modernist gallery room — miniature spotlights, a tiny pedestal, negative-space walls — the piece the size of a sculpture inside this constructed world, shot from eye-level with the miniature room, jewelry's real colors and geometry faithfully retained",
 
     # --- Motion Freeze Portrait (1) ---
     "Jewelry captured in a slow-motion portrait freeze: model mid-turn, hair lifted by motion, gown fabric trailing, the jewelry piece pinned in absolute tack-sharp focus while all surrounding elements render at 1/15s motion blur, high-power strobe freezing only the piece, original jewelry color and shape reference-locked, cinematic luxury campaign aesthetic",
@@ -205,7 +202,7 @@ def _extract_image_url(data):
         return _extract_image_url(result)
     return None
 
-async def edit_image(session, image_url, prompt, model_key="gpt", notify=None):
+async def edit_image(session, image_url, prompt, model_key=DEFAULT_MODEL, notify=None):
     """
     Submit an edit job to fal.ai and poll for the result.
     Uses async mode (no sync_mode) because image editing can take
@@ -213,6 +210,7 @@ async def edit_image(session, image_url, prompt, model_key="gpt", notify=None):
     
     model_key: "gpt" (GPT Image 2) or "nano" (Nano Banana 2)
     """
+    model_id = AVAILABLE_MODELS.get(model_key, AVAILABLE_MODELS[DEFAULT_MODEL])["id"]
     api_url = get_model_api(model_key)
     headers = {"Authorization": f"Key {FAL_AI_KEY}", "Content-Type": "application/json"}
     payload = {"prompt": prompt, "image_urls": [image_url]}
@@ -245,8 +243,9 @@ async def edit_image(session, image_url, prompt, model_key="gpt", notify=None):
 
         # Step 2: Poll for completion
         # gpt-image-2/edit can take 2-5 minutes. Poll every 5s for up to 6 minutes.
-        status_url = f"https://fal.run/{GPT_EDIT_MODEL}/requests/{request_id}/status"
-        result_url = f"https://fal.run/{GPT_EDIT_MODEL}/requests/{request_id}"
+        # nano-banana-2 often returns results directly or much faster.
+        status_url = f"https://fal.run/{model_id}/requests/{request_id}/status"
+        result_url = f"https://fal.run/{model_id}/requests/{request_id}"
         max_polls = 72  # 6 minutes at 5 second intervals
         poll_interval = 5
 
@@ -362,7 +361,7 @@ async def download_image(session, url, path):
     print(f"DOWNLOAD FAILED: {url}", flush=True)
     return False
 
-async def process_jewelry_request(request_type, params, callback_msg=None, model_key="gpt"):
+async def process_jewelry_request(request_type, params, callback_msg=None, model_key=DEFAULT_MODEL):
     """
     Main entry point for the bot logic.
     callback_msg: aiogram Message object for live progress updates

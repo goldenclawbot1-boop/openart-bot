@@ -18,7 +18,9 @@ class JewelrySessionManager:
 
     def handle_option(self, user_id, option):
         session = self.sessions.get(user_id)
-        if not session: return "Please start first."
+        if not session:
+            # Auto-create session if lost (e.g. after bot restart)
+            session = self.start_session(user_id)
         
         if option == "A":
             session["step"] = "AWAITING_UPLOAD"

@@ -352,7 +352,8 @@ async def cmd_cancel(message: Message):
         session["step"] = "START"
         session["config"] = {}
         session["uploaded_files"] = []
-    await message.answer("↩ **Cancelled.** Starting fresh.", parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+    await message.answer("↩ **Cancelled.** Starting fresh.", parse_mode="Markdown")
+    await show_welcome_menu(message.chat.id, user_id=message.from_user.id)
 
 @dp.callback_query(F.data.startswith("jewel_opt_"))
 async def handle_jewelry_option(callback: CallbackQuery):
@@ -361,6 +362,8 @@ async def handle_jewelry_option(callback: CallbackQuery):
     response = jewelry_mgr.handle_option(user_id, option)
     await callback.message.answer(response)
     await callback.answer()
+    # Show welcome menu so user always has buttons
+    await show_welcome_menu(callback.message.chat.id, user_id=callback.from_user.id)
 
 @dp.callback_query(F.data == "jewel_status")
 async def handle_status_check(callback: CallbackQuery):
@@ -655,7 +658,10 @@ async def handle_all_photos(message: Message, state: FSMContext):
             )
             return
         
-        await message.answer(response)
+        # Still in upload mode — show Cancel button so user isn't trapped
+        builder = InlineKeyboardBuilder()
+        builder.button(text="↩ Cancel", callback_data="jewel_cancel")
+        await message.answer(response, reply_markup=builder.as_markup())
         return
     
     current_state = await state.get_state()
