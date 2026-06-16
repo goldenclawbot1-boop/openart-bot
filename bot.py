@@ -179,6 +179,18 @@ WELCOME_TEXT = (
 # Per-user model preference (defaults to "gpt")
 user_model = {}
 
+def get_welcome_text(user_id: int) -> str:
+    """Build welcome text with current model info."""
+    model_key = user_model.get(user_id, DEFAULT_MODEL)
+    info = AVAILABLE_MODELS[model_key]
+    return (
+        "🎨 **Welcome to the AI Art Studio!**\n\n"
+        f"🤖 **Active Model:** {info['emoji']} **{info['name']}** — {info['desc']}\n\n"
+        "🖼️ **Create:** `/draw <prompt>`\n"
+        "✂️ **Edit:** `/edit`\n"
+        "💎 **Jewelry Studio:** Choose an option below for professional renders!\n"
+    )
+
 def get_welcome_keyboard():
     builder = InlineKeyboardBuilder()
     builder.button(text="📦 Option A: Batch Upload", callback_data="jewel_opt_a")
@@ -189,9 +201,10 @@ def get_welcome_keyboard():
     builder.adjust(2, 2, 1)
     return builder.as_markup()
 
-async def show_welcome_menu(chat_id):
+async def show_welcome_menu(chat_id, user_id=None):
     """Re-show the welcome menu so user can easily generate more."""
-    await bot.send_message(chat_id, WELCOME_TEXT, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
+    text = get_welcome_text(user_id) if user_id else WELCOME_TEXT
+    await bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=get_welcome_keyboard())
 
 # --- Handlers ---
 
@@ -238,7 +251,7 @@ async def handle_model_select(callback: CallbackQuery):
         f"✅ Model switched to {info['emoji']} **{info['name']}** — {info['desc']}",
         parse_mode="Markdown"
     )
-    await show_welcome_menu(callback.message.chat.id)
+    await show_welcome_menu(callback.message.chat.id, user_id=callback.from_user.id)
     await callback.answer()
 
 @dp.message(Command("start"))
@@ -406,7 +419,7 @@ async def handle_cancel(callback: CallbackQuery):
     if not files:
         # No files — go back to welcome
         await callback.message.answer("↩ Cancelled. Let's start over.")
-        await show_welcome_menu(callback.message.chat.id)
+        await show_welcome_menu(callback.message.chat.id, user_id=callback.from_user.id)
         await callback.answer()
         return
     
@@ -963,7 +976,7 @@ async def handle_confirm_generate(callback: CallbackQuery):
         print(f"CRITICAL ERROR: {traceback.format_exc()}")
         await callback.message.answer(f"❌ **Critical Error:**\n`{str(e)}`")
     finally:
-        await show_welcome_menu(callback.message.chat.id)
+        await show_welcome_menu(callback.message.chat.id, user_id=callback.from_user.id)
 
 @dp.message(Command("draw"))
 async def cmd_draw(message: Message):
@@ -981,7 +994,7 @@ async def handle_style(callback: CallbackQuery):
     url = await generate_flux_image(enhance_prompt(prompt, style))
     if url: await callback.message.answer_photo(photo=url, caption=f"🎨 {style}")
     else: await callback.message.answer("❌ Failed.")
-    await show_welcome_menu(callback.message.chat.id)
+    await show_welcome_menu(callback.message.chat.id, user_id=callback.from_user.id)
 
 @dp.message(Command("edit"))
 async def cmd_edit(message: Message, state: FSMContext):
@@ -995,7 +1008,7 @@ async def receive_edit_prompt(message: Message, state: FSMContext):
     if url: await message.answer_photo(photo=url, caption="✅ Edited!")
     else: await message.answer("❌ Failed.")
     await state.clear()
-    await show_welcome_menu(message.chat.id)
+    await show_welcome_menu(message.chat.id, user_id=message.from_user.id)
 
 async def main():
     try: await dp.start_polling(bot)
