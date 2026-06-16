@@ -41,33 +41,24 @@ def log_debug(msg):
     logger.debug(msg)
 
 JEWELRY_PROMPTS = [
-    # --- Studio Product Photography (4) ---
-    "The jewelry piece placed on a smooth white marble surface, professional studio lighting with two soft-box lights from 45-degree angles, pure white background, ultra-sharp macro focus capturing all surface details, no color alteration, product photography style",
-    "Jewelry displayed on a minimalist frosted glass pedestal, diffused overhead light with a subtle fill reflector, neutral gray gradient background, tack-sharp lens, colors and form exactly as original, commercial luxury brand style",
-    "Flat-lay top-down view of the jewelry item on a brushed light-gray concrete surface, ring flash lighting for even illumination, high-resolution macro capture preserving every facet and texture, exact original color palette retained",
-    "Jewelry suspended on a fine transparent acrylic stand against a deep charcoal background, dramatic rim lighting highlighting contours without altering metal tone or stone color, fine-art product photography",
+    # --- Precision Studio (4) ---
+    "The jewelry piece centered on a hand-polished obsidian stone slab, surface veining visible beneath the piece, a single focused beam of fiber-optic light entering from camera-left at 12 degrees, casting a razor-thin shadow that traces the object's exact silhouette, photographed at f/11 with tilt-shift lens correcting all perspective, zero color or shape modification to the jewelry",
+    "Jewelry suspended mid-air by a near-invisible 0.1mm monofilament above a flawless water surface, captured at the precise millisecond its reflection is perfectly symmetrical below, studio strobe synchronized at 1/8000s freezing every droplet of ambient mist, ultra-sharp 100mm macro, original jewelry hue and geometry unaltered",
+    "The piece displayed inside an open luxury watch box lined with cream Alcantara, the box resting on a raw slab of Calacatta marble with gold veining, soft window light diffused through 1.5-stop silk, color temperature locked at 5500K, camera positioned at 35-degree downward tilt, jewelry color and silhouette completely faithful to original",
+    "Jewelry placed inside a hand-blown glass dome on a thin mirrored plinth, light entering only through the top of the dome creating a precise cone of illumination that isolates the piece from its environment, surrounding area falls to pure darkness, 8x10 large-format rendering quality, jewelry color and dimensions unmodified",
 
-    # --- Lifestyle / Worn (4) ---
-    "A woman's elegant hand wearing the jewelry against a soft bokeh outdoor garden background, natural golden-hour sunlight, lifestyle fashion aesthetic, original jewelry color and form fully preserved, shallow depth of field",
-    "Close-up of the jewelry worn at a refined wrist or neckline, muted linen fabric in the background, natural window light casting soft shadows, upscale lifestyle editorial mood, no color or shape modification to the piece",
-    "Jewelry resting on a real marble vanity tray beside a single white orchid and soft linen cloth, warm ambient room light, luxury lifestyle still-life composition, all original material finishes maintained",
-    "Jewelry being held gently in a model's palm, soft natural daylight from a side window, minimal depth of field isolating the piece, authentic skin tone and original jewelry color unmodified, aspirational lifestyle mood",
+    # --- Editorial / Narrative (3) ---
+    "Deconstructed high-jewelry still life: the main piece anchoring the center, surrounded by its raw material counterparts — uncut gemstones, rough metal ingots, jeweler's tools — all arranged on a velvet tray, single overhead beauty dish light, editorial narrative composition, exact original color and form of the jewelry preserved",
+    "Extreme close-up of the jewelry against the décolletage of a model in a silk noir gown, Hasselblad medium-format rendering, a single Broncolor Para 88 light source at 45 degrees feathered across skin and piece simultaneously, bokeh background of blurred crystal chandeliers, jewelry original color and shape retained with forensic accuracy",
+    "Jewelry worn at the wrist of a model submerged to elbow depth in a shallow tray of still mineral water with a single white gardenia floating nearby, camera shooting through water surface at 15-degree angle, Profoto ring light on axis, the jewelry's original metal tone and stone colors refracted but reference-matched in post to original, shape perfectly unaltered",
 
-    # --- Lifestyle / Scene (3) ---
-    "The jewelry displayed beside a cup of espresso and an open book on a neutral linen tablecloth, warm indoor ambient light, relaxed morning lifestyle vibe, original metal and stone colors preserved accurately",
-    "Jewelry placed on top of a folded cashmere fabric in dusty rose, soft diffused studio-lifestyle hybrid lighting, high-end fashion mood, exact original shape and hue of the piece faithfully reproduced",
-    "Jewelry as the hero element in a high-fashion editorial spread, the piece photographed on a model in dramatic side-lighting with deep shadows, Vogue-level production quality, original design and color not modified",
+    # --- Material Contrast (2) ---
+    "Flat-lay composition: jewelry placed at the intersection of two contrasting luxury materials — one half raw aged bronze, one half polished white Thassos marble — the material boundary running diagonally beneath the piece, straight-down camera at 1:1 ratio, twin polarized lights eliminating all glare, original jewelry tones and structure intact",
+    "Jewelry resting inside a shallow ceramic bowl finished in matte biscuit-white, the bowl elevated on a stone riser inside an anechoic-white cove studio, seamless negative-fill black card on camera-right creating soft gradated shadow under the piece, 4x5 technical camera, zero modification to jewelry hue or silhouette",
 
-    # --- Editorial / Artistic (4) ---
-    "Overhead editorial flat-lay with the jewelry at center, surrounded by luxury props — pressed botanicals, gold foil paper, silk ribbon — neutral palette background so the piece remains dominant, color and form unaltered",
-    "The jewelry photographed against a textured aged-gold patterned backdrop, professional editorial lighting, cinematic color grade applied only to the environment, original jewelry material and tone left unchanged",
-    "Jewelry placed on a raw stone slab with scattered rose petals, high-fashion editorial composition, dramatic top-lighting, moody atmosphere, colors and silhouette of the piece exactly as designed",
-    "Close-up editorial portrait where the jewelry is featured near the collarbone or earlobe, soft rim lighting on skin, negative space in background for text, original jewelry geometry and color perfectly intact",
-
-    # --- Macro / Detail (3) ---
-    "Extreme macro shot of the jewelry showing micro-detail — every prong, grain, and facet — under a ring-flash and fiber optic side light combination, clinical precision, original color and shape not modified, white seamless background",
-    "45-degree macro angle capturing depth of the jewelry construction — layers, settings, and textures — with razor-sharp focus throughout, studio light eliminating all shadows, faithful representation of exact original color",
-    "Reflective detail shot with the jewelry tilted to catch a specular highlight across the surface, neutral dark slate background providing contrast, original tone and surface treatment unchanged, ultra-high resolution",
+    # --- Optical / Atmospheric (2) ---
+    "The jewelry piece photographed through a pane of etched optical glass that creates concentric circle refractions in the negative space while leaving the centered jewelry in perfect crystalline focus, background a single flat tone of warm ash gray, technical composite photograph, jewelry color and shape not manipulated",
+    "The piece lit exclusively by the natural luminescence of backlit Japanese shoji paper panels, color temperature 4200K, a precise snooted accent light at 3% power defining the highest specular point on the piece, deep cream background, long-exposure integration, original jewelry color and form reproduced with scientific fidelity",
 ]
 
 def load_state():
